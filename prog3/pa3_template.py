@@ -45,26 +45,54 @@ def receiveOnePing(mySocket, ID, timeout, destAddr, seqNum):
 
         print("[*] Received packet of length:", len(recPacket))
 
+        # Need - IP, TTL, Upper Layer ICMP?, Data, Valid checksum, echo reply?, 
         # ********************************************
         #Fetch the IP header data you need
-        # Need - IP, TTL, Upper Layer ICMP?, Data, Valid checksum, echo reply?, 
-        pack = recPacket.unpack("bbHHh")
-        print(pack.at(2))
-        check = pack.at(2) + checksum(recPacket)
-        print(check)
+        ip_version = recPacket[0] >> 4
+        if ip_version != 4:
+            raise Exception(f"This program only supports IPv4 your gave IPv{ip_version}") 
+        ip_header_len = recPacket[0] & 0xF
+        icmp_header_offset = ip_header_len * 4
+        
+        ttl = recPacket[8]
+        src_ip = f"{recPacket[12]}.{recPacket[13]}.{recPacket[14]}.{recPacket[15]}"
+        dst_ip = f"{recPacket[16]}.{recPacket[17]}.{recPacket[18]}.{recPacket[19]}"
+        protocol = recPacket[9]
+
         #Print IP data
-        print()
+        
+        print(f"IP: {src_ip} -> {dst_ip}") 
+        print(f"TTL: {ttl}")
+        print(f"Upper Layer ICMP? {protocol == 1}")
+
         #Fetch the ICMP header data you need
+        type, code, check_sum, id, seq_num, icmp_data = struct.unpack("bbHHhd", recPacket[icmp_header_offset:])
+        
+        checksum_valid = False
+        if not checksum(recPacket[icmp_header_offset:]):
+            checksum_valid = True
+
+        icmp_reply = False
+        if type == 0 and code == 0:
+            icmp_reply = True
+
+        seq_id_valid = False
+        if seq_num == seqNum and id == ID:
+            seq_id_valid = True
+
 
         #Print ICMP data
-        print()
+        print(f"ICMP Data: {icmp_data}")
+        print(f"ICMP Checksum valid? {check_sum}")
+        print(f"ICMP Echo Reply? {icmp_reply}")
+        print(f"ICMP IDs & Seq Nums as Expected? {seq_id_valid}")
         #Return total time elapsed in ms
-        return time.time() - startedSelect
         # ********************************************
 
         timeLeft = timeLeft - howLongInSelect
         if timeLeft <= 0:
             return "Request timed out."
+        return (time.time() - startedSelect) * 1000
 
 def sendOnePing(mySocket, destAddr, ID, seqNum):
     # Header is type (8), code (8), checksum (16), id (16), sequence (16)
@@ -75,7 +103,7 @@ def sendOnePing(mySocket, destAddr, ID, seqNum):
     header = struct.pack("bbHHh", ICMP_ECHO_REQUEST, 0, myChecksum, ID, seqNum)
     data = struct.pack("d", time.time())
     # Calculate the checksum on the data and the dummy header.
-    print(header + data)
+    # print(header + data)
     myChecksum = checksum(header + data)
     myChecksum = htons(myChecksum)
     
@@ -86,7 +114,7 @@ def sendOnePing(mySocket, destAddr, ID, seqNum):
 def doOnePing(destAddr, timeout, seqNum):
     icmp = getprotobyname("icmp")
 
-    mySocket = socket(AF_INET, SOCK_RAW, icmp);
+    mySocket = socket(AF_INET, SOCK_RAW, icmp)
 
     myID = os.getpid() & 0xFFFF #Returns the current process id
     sendOnePing(mySocket, destAddr, myID, seqNum)
