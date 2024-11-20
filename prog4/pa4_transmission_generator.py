@@ -3,8 +3,8 @@ C1 = [1,1,-1,1]
 C2 = [-1,1,-1,-1]
 
 #You can comment these out for testing, but M1 and M2 are what you are trying to find out from transmission.txt
-#M1 = "HELLO"
-#M2 = "OYEAH"
+M1 = "HELLO"
+M2 = "OYEAH"
 
 ENCODING_MAP = {"A" : [1,1,1,1,1], \
                 "B" : [1,1,1,1,-1], \
@@ -81,7 +81,7 @@ trans2 = encodeStringToCDMA(M2,C2)
 
 combinedTrans = addTransmissions(trans1, trans2)
       
-outfile = open('transmission.txt', 'w')
+outfile = open('transmission_1.txt', 'w')
 outputRawTransmission(combinedTrans, outfile)
 outfile.close()
 
