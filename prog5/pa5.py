@@ -10,11 +10,11 @@ def ball_animation():
     if ball.top <= 0 or ball.bottom >= height:
         ball_speed_y *= -1
         
-    if ball.left <= 0:
+    if ball.right <= 0:
         player_score += 1
         score_time = pygame.time.get_ticks()
         
-    if ball.right >= width:
+    if ball.left >= width:
         opponent_score += 1
         score_time = pygame.time.get_ticks()
 
@@ -51,7 +51,7 @@ def opponent_animation():
         opponent.bottom = height
 
 def ball_start():
-    global ball_speed_y, ball_speed_x,score_time
+    global ball_speed_y, ball_speed_x, score_time
 
     current_time = pygame.time.get_ticks()
     ball.center = (width//2, height//2)
@@ -90,7 +90,6 @@ if len(sys.argv) < 2:
     WINDOW_TITLE = "Pong SERVER " + str(serverSocket.getsockname()[0]) + ":" + str(serverSocket.getsockname()[1])
     SERVER = True
     CLIENT_CONNECTED = False
-    
 elif len(sys.argv) < 3:
     print('starting server...')    
     ip_port = sys.argv[1].split(':')
@@ -131,13 +130,16 @@ game_font = pygame.font.Font(None,25)
 
 score_time = True
 
-while True:
+INITIALIZE = True
+seq_num_send = 0
+seq_num_rec = 0
 
+while True:
     #Get Keyboard Input
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
-            break;
+            break
         if event.type == pygame.KEYDOWN:
                             
             if event.key == pygame.K_DOWN:
@@ -151,7 +153,6 @@ while True:
                 player_speed -= 5
             if event.key == pygame.K_UP:
                 player_speed += 5
-
     
     
     if SERVER:
@@ -160,28 +161,74 @@ while True:
             player_text = game_font.render("waiting for client to connect", False, light_grey)
             screen.blit(player_text,(345,235))
             pygame.display.flip()
-            #CLIENT_CONNECTED = True
+            CLIENT_CONNECTED = True
         
+
         #handle server messaging here
-        print('add your code here')
-        ##
-
-        serverSocket.recvfrom(1024)
-        ##
-        ##
-        ##
-
+        if INITIALIZE:
+            data, client = serverSocket.recvfrom(1024)
+            seed = pygame.time.get_ticks()
+            random.seed(seed)
+            serverSocket.sendto(str(-1).encode() + ",".encode() + str(seed).encode(), client)
+            serverSocket.settimeout(.001)
+            INITIALIZE = False
         
+        try:
+            data, client = serverSocket.recvfrom(1024)
+            rec = data.decode()
+            if seq_num_rec <= int(rec.split(',')[0]):
+                seq_num_rec, opponent_speed = map(int, data.decode().split(','))
+                seq_num_rec += 1
+            elif int(rec.split(',')[0]) == -1:
+                seed = pygame.time.get_ticks()
+                random.seed(seed)
+                serverSocket.sendto(str(-1).encode() + ",".encode() + str(seed).encode(), client)        
+            else:
+                print(seq_num_rec, ":", int(rec.split(',')[0]), "not equal")
+            while True:
+                serverSocket.recvfrom(1024)
+        except:
+            print(seed)
+
+        data = str(seq_num_send) + "," + str(player_score) + "," + str(opponent_score) + "," + str(player_speed)
+        seq_num_send += 1
+        serverSocket.sendto(data.encode(), client)
     else:
-        
         #handle client messaging here
-        print('add your client code here')
-        ##
-        ##
-        ##
-        ##
-        ##
+        data = str(seq_num_send) + "," + str(player_speed)
+        seq_num_send += 1
+        clientSocket.sendto(data.encode(), (serverIP, serverPort))
+        print(seq_num_send)
+        if INITIALIZE:
+            done = False
+            while not done:
+                data, server = clientSocket.recvfrom(1024)
+                seq_num_rec += 1
+                if data.decode().split(',')[0] == -1:
+                    seed = map(int, data.decode().split(',')[1])
+                    random.seed(seed)
+                    print(seed)
+                    done = True
+                else:
+                    data = str(-1)
+                    clientSocket.sendto(data.encode(), (serverIP, serverPort))
 
+                clientSocket.settimeout(.001)
+            INITIALIZE = False
+        
+        try:
+            rec_data, server = clientSocket.recvfrom(1024)
+            rec = rec_data.decode()
+            if seq_num_rec <= int(rec.split(',')[0]):
+                seq_num_rec, opponent_score, player_score, opponent_speed = map(int, rec.split(','))
+                seq_num_rec += 1
+            else:
+                print(seq_num_rec, ":", int(rec.split(',')[0]), "not equal")
+            while True:
+                clientSocket.recvfrom(1024)
+        except:
+            print(seed)
+    
     #Update game object states
     ball_animation()
     player_animation()
