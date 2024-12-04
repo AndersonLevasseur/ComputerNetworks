@@ -198,22 +198,25 @@ while True:
         data = str(seq_num_send) + "," + str(player_speed)
         seq_num_send += 1
         clientSocket.sendto(data.encode(), (serverIP, serverPort))
-        print(seq_num_send)
         if INITIALIZE:
             done = False
             while not done:
+                print(f"almost")
                 data, server = clientSocket.recvfrom(1024)
+                print(f"rec")
                 seq_num_rec += 1
-                if data.decode().split(',')[0] == -1:
-                    seed = map(int, data.decode().split(',')[1])
+                if int(data.decode().split(',')[0]) == -1:
+                    seed = int(data.decode().split(',')[1])
+                    print(data.decode().split(',')[1])
+                    print(int(seed))
                     random.seed(seed)
-                    print(seed)
                     done = True
                 else:
+                    print(f"seq num : {data.decode().split(',')[0]} : {data.decode().split(',')[0] == -1}")
                     data = str(-1)
                     clientSocket.sendto(data.encode(), (serverIP, serverPort))
-
-                clientSocket.settimeout(.001)
+                print("here")
+                clientSocket.settimeout(.1)
             INITIALIZE = False
         
         try:
@@ -227,7 +230,7 @@ while True:
             while True:
                 clientSocket.recvfrom(1024)
         except:
-            print(seed)
+            print(f"except {seq_num_rec}")
     
     #Update game object states
     ball_animation()
